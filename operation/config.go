@@ -31,7 +31,7 @@ func dupStrings(s []string) []string {
 	return to
 }
 
-func (sdk SDK) Load(file string) (*Config, error) {
+func Load(file string) (*Config, error) {
 	var configuration Config
 	raw, err := ioutil.ReadFile(file)
 	if err != nil {
@@ -54,7 +54,7 @@ var g_conf *Config
 
 var confLock sync.Mutex
 
-func (sdk SDK) getConf() *Config {
+func getConf() *Config {
 	up := os.Getenv("STORE")
 	if up == "" {
 		elog.Warn("not set store environment")
@@ -65,17 +65,17 @@ func (sdk SDK) getConf() *Config {
 	if g_conf != nil {
 		return g_conf
 	}
-	c, err := sdk.Load(up)
+	c, err := Load(up)
 	if err != nil {
 		elog.Warn("load conf failed", up, err)
 		return nil
 	}
 	g_conf = c
-	sdk.watchConfig(up)
+	watchConfig(up)
 	return c
 }
 
-func (sdk SDK) watchConfig(filename string) {
+func watchConfig(filename string) {
 	initWG := sync.WaitGroup{}
 	initWG.Add(1)
 	go func() {
@@ -108,7 +108,7 @@ func (sdk SDK) watchConfig(filename string) {
 						event.Op&writeOrCreateMask != 0) ||
 						(currentConfigFile != "" && currentConfigFile != realConfigFile) {
 						realConfigFile = currentConfigFile
-						c, err := sdk.Load(realConfigFile)
+						c, err := Load(realConfigFile)
 						fmt.Printf("re reading config file: error %v\n", err)
 						if err == nil {
 							g_conf = c

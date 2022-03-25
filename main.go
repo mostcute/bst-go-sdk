@@ -1,15 +1,26 @@
 package main
 
 import (
-	"fmt"
+	"flag"
+	"log"
 	"stroage-go-sdk/operation"
 )
 
 func main() {
-	var sdk = new(operation.SDK)
-	cfg, err := sdk.Load("cfg.toml")
+	cf := flag.String("c", "cfg_bst.toml", "config")
+	flag.Parse()
+
+	x, err := operation.Load(*cf)
 	if err != nil {
-		return
+		log.Fatalln(err)
 	}
-	fmt.Printf("%v", *cfg)
+
+	uploader := operation.NewUploader(x)
+
+	uploader.Upload("go.mod", "/root/test2", true)
+
+	download := operation.NewDownloader(x)
+
+	download.DownloadFile("/root/test2", "test.txt")
+
 }

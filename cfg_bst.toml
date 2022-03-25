@@ -1,0 +1,10 @@
+io_hosts = ["172.22.121.219:5002"]
+bucket = "uutest"
+part = 12800000
+delete = true
+up_concurrency = 16
+down_path = ""
+sim = false
+retry = 0
+base_timeout_ms = 300000
+#uc_hosts = ["172.31.29.118:5002"]
