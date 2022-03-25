@@ -1,0 +1,15 @@
+io_hosts = ["172.31.66.87:9000"]
+up_hosts = []
+rs_hosts = []
+rsf_hosts = []
+bucket = "mytest"
+ak = "root"
+sk = "abc12345678"
+part = 64
+delete = true
+up_concurrency = 16
+down_path = ""
+sim = false
+retry = 0
+punish_time_s = 0
+dial_timeout_ms = 0
