@@ -1,0 +1,17 @@
+"io_hosts"=["http://10.1.200.110:5000","http://10.1.200.111:5000","http://10.1.200.112:5000","http://10.1.200.113:5000"]
+"uc_hosts"=["http://10.1.200.111:10221","http://10.1.200.112:10221","http://10.1.200.113:10221"]
+"up_hosts"=["http://10.1.200.110:5010","http://10.1.200.111:5010","http://10.1.200.112:5010","http://10.1.200.113:5010"]
+"rs_hosts"=["http://10.1.200.110:9433","http://10.1.200.111:9433","http://10.1.200.112:9433","http://10.1.200.113:9433"]
+"rsf_hosts"=["http://10.1.200.110:7913","http://10.1.200.111:7913","http://10.1.200.112:7913","http://10.1.200.113:7913"]
+"bucket"="qqq"
+"ak"="IPMuF5IYTsA3JMHNdMOOuJ-u02gkbpb_UxNoe1UJ"
+"sk"="Rtw0IMNCCp8lTCMpyoxG5w58BI2o9h-WtNYoHstv"
+"part"=255
+"addr"=":10800"
+"delete"=true
+"up_concurrency"=6
+"down_path"=""
+"sim"=false
+"retry"=0
+"punish_time_s"=0
+"dial_timeout_ms"=30000

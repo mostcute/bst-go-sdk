@@ -2,6 +2,7 @@ package operation
 
 import (
 	"context"
+	"github.com/qiniupd/qiniu-go-sdk/x/bytes.v7"
 	"github.com/qiniupd/qiniu-go-sdk/x/rpc.v7"
 	"io"
 	"net/http"
@@ -52,6 +53,22 @@ func (p *Uploader) Upload(file string, key string, overView bool) (err error) {
 	return
 }
 
+func (p *Uploader) UploadBytes(data []byte, key string, overView bool) (err error) {
+	t := time.Now()
+	defer func() {
+		elog.Info("up time ", key, time.Now().Sub(t))
+	}()
+
+	for i := 0; i < 3; i++ {
+		err = p.put(context.Background(), nil, key, bytes.NewReader(data), int64(len(data)), p.bucket, p.partSize, overView)
+		if err == nil {
+			break
+		}
+		elog.Info("small upload retry", i, err)
+	}
+	return
+}
+
 func NewUploader(c *Config) *Uploader {
 	var queryer *Queryer = nil
 
@@ -88,6 +105,41 @@ func (p Uploader) chooseUpHost() string {
 		}
 		return upHost
 	}
+}
+
+func (p Uploader) put(ctx context.Context, ret interface{}, key string, data io.Reader, size int64, bucket string,
+	blockSize int64, overView bool) error {
+
+	upHost := p.chooseUpHost()
+	url := "http://" + upHost + "/objects/put/" + bucket
+
+	if key != "" {
+		url += "/" + key
+	}
+	elog.Debug("Put2", url)
+	req, err := http.NewRequest("PUT", url, data)
+	if err != nil {
+		failHostName(upHost)
+		return err
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set("blocksize", strconv.FormatInt(blockSize, 10))
+	req.Header.Set("overwrite", strconv.FormatBool(overView))
+
+	req.ContentLength = size
+	p.NewUploaderClient()
+	resp, err := p.Conn.Do(ctx, req)
+	if err != nil {
+		failHostName(upHost)
+		return err
+	}
+	err = rpc.CallRet(ctx, ret, resp)
+	if err != nil {
+		failHostName(upHost)
+		return err
+	}
+	succeedHostName(upHost)
+	return nil
 }
 
 func (p Uploader) put2(ctx context.Context, ret interface{}, key string, data io.ReaderAt, size int64, bucket string,

@@ -188,7 +188,7 @@ func (d *Downloader) downloadBytesInner(key string) ([]byte, error) {
 	}
 	host := d.nextHost()
 
-	url := fmt.Sprintf("%s/objects/getfile/%s/%s", host, d.bucket, key)
+	url := fmt.Sprintf("http://%s/objects/getfile/%s/%s", host, d.bucket, key)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -270,4 +270,40 @@ func getTotalLength(crange string) (int64, error) {
 	}
 
 	return strconv.ParseInt(cr[1], 10, 64)
+}
+
+func (d *Downloader) getFileExietInner(fileName string) (string, error) {
+	host := d.nextHost()
+	elog.Infof("Get File Exiet %s \n", d.bucket)
+	url := fmt.Sprintf("http://%s/objects/getfile/%s/%s", host, d.bucket, fileName)
+	req, err := http.NewRequest("HEAD", url, nil)
+	if err != nil {
+		failHostName(host)
+		return err.Error(), err
+	}
+	req.Header.Set("Accept-Encoding", "")
+	response, err := downloadClient.Do(req)
+	if err != nil {
+		failHostName(host)
+		return err.Error(), err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusNotFound {
+		failHostName(host)
+		return err.Error(), errors.New(response.Status)
+	}
+	succeedHostName(host)
+	return response.Status, nil
+}
+
+func (d *Downloader) GetFileExiet(fileName string) (string, error) {
+	var err error
+	for i := 0; i < 3; i++ {
+		res, err := d.getFileExietInner(fileName)
+		if err == nil {
+			return res, nil
+		}
+	}
+	return err.Error(), err
 }

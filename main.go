@@ -15,12 +15,41 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	uploader := operation.NewUploader(x)
+	down := operation.NewDownloader(x)
+	data, err := down.DownloadBytes("test")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	up := operation.NewUploader(x)
+	err = up.UploadBytes(data, "ceshi", false)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 
-	uploader.Upload("go.mod", "/root/test2", true)
+	down.DownloadFile("ceshi", "ceshi")
 
-	download := operation.NewDownloader(x)
+	//deleter := operation.NewDeleter(x)
+	//deleter.DeleteFile("/root/test")
 
-	download.DownloadFile("/root/test2", "test.txt")
+	//bucketer := operation.NewBucketer(x)
+	////bucketer.MakeBucket("uutest")
+	//status, err := bucketer.ListObject("uutest")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//fmt.Printf("%v", status)
+	//uploader := operation.NewUploader(x)
+	//
+	//uploader.Upload("go.mod", "/root/test", true)
+	//
+	//modify := operation.NewModifier(x)
+	//modify.RenameFile("test2", "/root/ttest")
 
+	//info, err := download.GeFileExiet("/root/test2")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//fmt.Printf("%s", info)
 }

@@ -9,6 +9,7 @@ import (
 type Ilog interface {
 	Debug(v ...interface{})
 	Info(v ...interface{})
+	Infof(format string, v ...interface{})
 	Warn(v ...interface{})
 	Error(v ...interface{})
 	Fatal(v ...interface{})
@@ -41,6 +42,13 @@ func (l *logger) Info(v ...interface{}) {
 		return
 	}
 	log.Output(2, fmt.Sprintln(v...))
+}
+
+func (l *logger) Infof(format string, v ...interface{}) {
+	if l.level > LOG_LEVEL_INFO {
+		return
+	}
+	log.Output(2, fmt.Sprintf(format, v...))
 }
 
 func (l *logger) Warn(v ...interface{}) {
