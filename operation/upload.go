@@ -1,10 +1,11 @@
 package operation
 
 import (
+	"bytes"
 	"context"
-	"github.com/qiniupd/qiniu-go-sdk/x/bytes.v7"
-	"github.com/qiniupd/qiniu-go-sdk/x/rpc.v7"
+	"errors"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -21,7 +22,22 @@ type Uploader struct {
 	upConcurrency int
 	overview      bool
 	queryer       *Queryer
-	Conn          rpc.Client
+}
+
+var uploadClient = &http.Client{
+	Transport: &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   1 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	},
+	Timeout: 10 * time.Minute,
 }
 
 func (p *Uploader) Upload(file string, key string, overView bool) (err error) {
@@ -84,10 +100,6 @@ func NewUploader(c *Config) *Uploader {
 	}
 }
 
-func (p *Uploader) NewUploaderClient() {
-	p.Conn.Client = &http.Client{Transport: nil, Timeout: 10 * time.Minute}
-}
-
 func (p Uploader) chooseUpHost() string {
 	switch len(p.upHosts) {
 	case 0:
@@ -127,16 +139,15 @@ func (p Uploader) put(ctx context.Context, ret interface{}, key string, data io.
 	req.Header.Set("overwrite", strconv.FormatBool(overView))
 
 	req.ContentLength = size
-	p.NewUploaderClient()
-	resp, err := p.Conn.Do(ctx, req)
+	resp, err := uploadClient.Do(req)
 	if err != nil {
 		failHostName(upHost)
 		return err
 	}
-	err = rpc.CallRet(ctx, ret, resp)
-	if err != nil {
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
 		failHostName(upHost)
-		return err
+		return errors.New(resp.Status)
 	}
 	succeedHostName(upHost)
 	return nil
@@ -162,16 +173,14 @@ func (p Uploader) put2(ctx context.Context, ret interface{}, key string, data io
 	req.Header.Set("overwrite", strconv.FormatBool(overView))
 
 	req.ContentLength = size
-	p.NewUploaderClient()
-	resp, err := p.Conn.Do(ctx, req)
+	resp, err := uploadClient.Do(req)
 	if err != nil {
 		failHostName(upHost)
 		return err
 	}
-	err = rpc.CallRet(ctx, ret, resp)
-	if err != nil {
+	if resp.StatusCode != http.StatusOK {
 		failHostName(upHost)
-		return err
+		return errors.New(resp.Status)
 	}
 	succeedHostName(upHost)
 	return nil

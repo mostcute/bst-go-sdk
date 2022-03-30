@@ -20,7 +20,7 @@ type DownloadInterface interface {
 
 type ModifyInterface interface {
 	DeleteFile(key string) (err error)
-	RenameFile(key, newname string)
+	RenameFile(key, newname string) (err error)
 }
 
 type BucketInterface interface {
@@ -28,5 +28,5 @@ type BucketInterface interface {
 	DeleteBucket(bucketName string) (err error)
 	ListBucket() (ListBucketReq, error)
 	GetBucketInfo(bucketName string) (string, error)
-	ListObject(bucketName string) (ListObjectReq, error)
+	ListObject(bucketName, prefix, size, page string) (ListObjectReq, error)
 }

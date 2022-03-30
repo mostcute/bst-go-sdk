@@ -184,7 +184,7 @@ func (b *Bucketer) getBucketInfoInner(bucketName string) (string, error) {
 	return response.Status, nil
 }
 
-func (b *Bucketer) listObjectInfoInner(bucketName string) (ListObjectReq, error) {
+func (b *Bucketer) listObjectInfoInner(bucketName, prefix, size, page string) (ListObjectReq, error) {
 	host := b.nextBucketHost()
 	elog.Infof("list Bucket Object %s \n", b.bucket)
 	url := fmt.Sprintf("http://%s/objects/listobject/%s", host, bucketName)
@@ -194,7 +194,10 @@ func (b *Bucketer) listObjectInfoInner(bucketName string) (ListObjectReq, error)
 		return nil, err
 	}
 	req.Header.Set("Accept-Encoding", "")
-	response, err := downloadClient.Do(req)
+	req.Header.Set("prefix", prefix)
+	req.Header.Set("Size", size)
+	req.Header.Set("Page", page)
+	response, err := bucketClient.Do(req)
 	if err != nil {
 		failHostName(host)
 		return nil, err
@@ -275,10 +278,10 @@ func (b *Bucketer) GetBucketInfo(bucketName string) (string, error) {
 	return err.Error(), err
 }
 
-func (b *Bucketer) ListObject(bucketName string) (ListObjectReq, error) {
+func (b *Bucketer) ListObject(bucketName, prefix, size, page string) (ListObjectReq, error) {
 	var err error
 	for i := 0; i < 3; i++ {
-		list, err := b.listObjectInfoInner(bucketName)
+		list, err := b.listObjectInfoInner(bucketName, prefix, size, page)
 		if err == nil {
 			return list, nil
 		}

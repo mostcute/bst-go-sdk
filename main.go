@@ -22,7 +22,7 @@ func main() {
 		return
 	}
 	up := operation.NewUploader(x)
-	err = up.UploadBytes(data, "ceshi", false)
+	err = up.UploadBytes(data, "ceshi", true)
 	if err != nil {
 		log.Fatal(err)
 		return
