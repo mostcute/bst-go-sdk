@@ -26,6 +26,7 @@ const fileChunk = 8192 // we settle for 8KB 8192
 var FileSize = []float64{1024, 10240, 102400, 1048576, 10485760, 10485760, 1073741824, 2147483648}
 
 type TestCase struct {
+	Config     *operation.Config
 	Uploader   *operation.Uploader
 	Downloader *operation.Downloader
 	Bucketer   *operation.Bucketer
@@ -130,7 +131,7 @@ func (t *TestCase) FileTest() error {
 			log.Errorf("remove all: %s", err)
 		}
 	}()
-	t.Bucketer.MakeBucket("uutest")
+	t.Bucketer.MakeBucket(t.Config.Bucket)
 	PathExists(testTmpPath)
 	log.Info("Create File...")
 	for i := 0; i < 8; i++ {
@@ -159,7 +160,7 @@ func (t *TestCase) DeleteTest() error {
 			log.Errorf("remove all: %s", err)
 		}
 	}()
-	err := t.Bucketer.DeleteBucket("uutest")
+	err := t.Bucketer.DeleteBucket(t.Config.Bucket)
 	if err != nil {
 		if find := strings.Contains(err.Error(), "Bucket not empty cannot delete"); find {
 			log.Info("Delete Test Success")
@@ -231,6 +232,7 @@ func runTestCase(ctx *cli.Context) error {
 		log.Error(err)
 	}
 	var testCase = &TestCase{
+		Config:     x,
 		Uploader:   operation.NewUploader(x),
 		Downloader: operation.NewDownloader(x),
 		Bucketer:   operation.NewBucketer(x),
@@ -247,7 +249,7 @@ func runTestCase(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	testCase.Bucketer.DeleteBucket("uutest")
+	testCase.Bucketer.DeleteBucket(testCase.Config.Bucket)
 	if err != nil {
 		log.Fatal(err)
 	}

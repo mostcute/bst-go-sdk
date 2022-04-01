@@ -1,5 +1,5 @@
 io_hosts = ["172.22.121.219:5002"]
-bucket = "uutest"
+bucket = "uutest3"
 part = 12800000
 delete = true
 up_concurrency = 16
