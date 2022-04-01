@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -178,9 +179,17 @@ func (p Uploader) put2(ctx context.Context, ret interface{}, key string, data io
 		failHostName(upHost)
 		return err
 	}
+
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		failHostName(upHost)
-		return errors.New(resp.Status)
+		return errors.New(string(body))
 	}
 	succeedHostName(upHost)
 	return nil

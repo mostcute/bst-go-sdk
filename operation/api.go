@@ -15,7 +15,7 @@ type DownloadInterface interface {
 	DownloadFile(key string, path string) (f *os.File, err error)
 	DownloadBytes(key string) (data []byte, err error)
 	DownloadRangeBytes(key string, offset, size int64) (l int64, data []byte, err error)
-	GetFileExiet(bucketName string) (string, error)
+	GetFileExiet(fileName string) (bool, error)
 }
 
 type ModifyInterface interface {

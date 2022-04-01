@@ -297,13 +297,17 @@ func (d *Downloader) getFileExietInner(fileName string) (string, error) {
 	return response.Status, nil
 }
 
-func (d *Downloader) GetFileExiet(fileName string) (string, error) {
+func (d *Downloader) GetFileExiet(fileName string) (bool, error) {
 	var err error
 	for i := 0; i < 3; i++ {
 		res, err := d.getFileExietInner(fileName)
 		if err == nil {
-			return res, nil
+			if find := strings.Contains(res, "200 OK"); find {
+				return true, nil
+			} else {
+				return false, errors.New(res)
+			}
 		}
 	}
-	return err.Error(), err
+	return false, err
 }

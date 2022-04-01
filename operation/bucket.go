@@ -75,7 +75,7 @@ func (b *Bucketer) nextBucketHost() string {
 
 func (b *Bucketer) makeBucketInner(bucketName string) error {
 	host := b.nextBucketHost()
-	fmt.Printf("make Bucket %s", b.bucket)
+	//fmt.Printf("make Bucket %s \n", b.bucket)
 	url := fmt.Sprintf("http://%s/objects/makebucket/%s", host, bucketName)
 	req, err := http.NewRequest("PUT", url, nil)
 	if err != nil {
@@ -100,7 +100,7 @@ func (b *Bucketer) makeBucketInner(bucketName string) error {
 
 func (b *Bucketer) deleteBucketInner(bucketName string) error {
 	host := b.nextBucketHost()
-	fmt.Printf("delete Bucket %s \n", b.bucket)
+	//fmt.Printf("delete Bucket %s \n", b.bucket)
 	url := fmt.Sprintf("http://%s/objects/deletebucket/%s", host, bucketName)
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
@@ -115,9 +115,14 @@ func (b *Bucketer) deleteBucketInner(bucketName string) error {
 	}
 	defer response.Body.Close()
 
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+
 	if response.StatusCode != http.StatusOK {
 		failHostName(host)
-		return errors.New(response.Status)
+		return errors.New(string(body))
 	}
 	succeedHostName(host)
 	return nil

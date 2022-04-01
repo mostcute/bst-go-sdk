@@ -3,6 +3,7 @@ package operation
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"sync/atomic"
@@ -59,7 +60,7 @@ func (d *Modify) nextHost() string {
 
 func (d *Modify) deleteFileInner(key string) error {
 	host := d.nextHost()
-	fmt.Printf("delete File %s \n", d.bucket)
+	//fmt.Printf("delete File %s \n", d.bucket)
 	url := fmt.Sprintf("http://%s/objects/deletefile/%s/%s", host, d.bucket, key)
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
@@ -74,9 +75,14 @@ func (d *Modify) deleteFileInner(key string) error {
 	}
 	defer response.Body.Close()
 
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+
 	if response.StatusCode != http.StatusOK {
 		failHostName(host)
-		return errors.New(response.Status)
+		return errors.New(string(body))
 	}
 	succeedHostName(host)
 	return nil
@@ -100,9 +106,14 @@ func (d *Modify) renameInner(key string, newName string) error {
 	}
 	defer response.Body.Close()
 
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+
 	if response.StatusCode != http.StatusOK {
 		failHostName(host)
-		return errors.New(response.Status)
+		return errors.New(string(body))
 	}
 	succeedHostName(host)
 	return nil
