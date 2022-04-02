@@ -66,7 +66,7 @@ func HandleErr(title string, err error) {
 	if err != nil {
 		log.Fatal(title, " ", err)
 	} else {
-		log.Info(title, "Success")
+		log.Infof("%s Success", title)
 	}
 }
 
@@ -97,9 +97,9 @@ func countFileMd5(filePath string) string {
 func PathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err != nil {
-		fmt.Println("stat temp dir error,maybe is not exist, maybe not")
+		fmt.Println("未发现临时文件夹")
 		if os.IsNotExist(err) {
-			fmt.Println("temp dir is not exist")
+			fmt.Println("临时文件夹不存在")
 			err := os.Mkdir(path, os.ModePerm)
 			if err != nil {
 				fmt.Printf("mkdir failed![%v]\n", err)
@@ -114,11 +114,12 @@ func PathExists(path string) (bool, error) {
 }
 
 func (t *TestCase) BucketInitTest() (err error) {
+	log.Info("开始测试Bucket创建与删除")
 	err = t.Bucketer.MakeBucket(testBucketName)
-	HandleErr("Make Bucket err ", err)
+	HandleErr("Make Bucket ", err)
 	err = t.Bucketer.DeleteBucket(testBucketName)
-	HandleErr("Delete Bucket err ", err)
-
+	HandleErr("Delete Bucket ", err)
+	log.Info("Bucket创建与删除测试完成")
 	return nil
 }
 
@@ -133,24 +134,26 @@ func (t *TestCase) FileTest() error {
 	}()
 	t.Bucketer.MakeBucket(t.Config.Bucket)
 	PathExists(testTmpPath)
-	log.Info("Create File...")
 	for i := 0; i < 8; i++ {
+		log.Infof("正在生成文件大小为%.2fKB的文件", FileSize[i]/1024)
 		CreateFixedFile(FileSize[i], fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i)))
 		t.SrcMd5 = append(t.SrcMd5, countFileMd5(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i))))
 	}
-	log.Info("Test File Creat Finish")
+	log.Info("测试文件生成完成")
 	for i := 0; i < 8; i++ {
+		log.Infof("开始上传文件大小为%.2fKB的文件", FileSize[i]/1024)
 		t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i)), fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i)), true)
 	}
 	PathExists(verifyTmpPath)
 	for i := 0; i < 8; i++ {
 		t.Downloader.DownloadFile(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i)), fmt.Sprintf("%s/test_%s", verifyTmpPath, strconv.Itoa(i)))
 		dstMd5 := countFileMd5(fmt.Sprintf("%s/test_%s", verifyTmpPath, strconv.Itoa(i)))
-		log.Infof("%s/%s", dstMd5, t.SrcMd5[i])
+		log.Infof("开始校验上传文件的MD5是否正确, MD5比较结果：%s/%s", dstMd5, t.SrcMd5[i])
 		if dstMd5 != t.SrcMd5[i] {
-			log.Fatal("Md5 check Error")
+			log.Fatal("Md5 检测失败")
 		}
 	}
+	log.Info("文件上传下载一致性检测完成")
 	return nil
 }
 
@@ -163,20 +166,20 @@ func (t *TestCase) DeleteTest() error {
 	err := t.Bucketer.DeleteBucket(t.Config.Bucket)
 	if err != nil {
 		if find := strings.Contains(err.Error(), "Bucket not empty cannot delete"); find {
-			log.Info("Delete Test Success")
+			log.Info("Bucket存在文件禁止删除测试通过")
 		}
 	} else {
-		log.Fatal("Delete Test Failed")
+		log.Fatal("Bucket存在文件禁止删除测试失败")
 	}
-	log.Info("Delete File Start")
+	log.Info("Bucket删除文件操作测试开始")
 	for i := 0; i < 8; i++ {
 		err = t.Modify.DeleteFile(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i)))
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
-	log.Info("Delete File Test Success")
-	log.Info("No Overwrite File Test Start")
+	log.Info("Bucket删除文件测试完成")
+	log.Info("非覆盖上传文件测试开始")
 	PathExists(testTmpPath)
 	CreateFixedFile(FileSize[0], fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(0)))
 	err = t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(0)), "overwrite_test", true)
@@ -186,21 +189,24 @@ func (t *TestCase) DeleteTest() error {
 	err = t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(0)), "overwrite_test", false)
 	if err != nil {
 		if find := strings.Contains(err.Error(), "obj already exist"); find {
-			log.Info("No OverWrite Test Success")
+			log.Info("非覆盖上传文件测试完成")
 		} else {
 			log.Fatal(err)
 		}
 	} else {
-		log.Fatal("File Overwrite Test Failed")
+		log.Fatal("非覆盖上传文件测试失败")
 	}
+	log.Info("覆盖文件上传模式测试开始")
 	err = t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(0)), "overwrite_test", true)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Info("File Overwrite Test Success")
-	log.Info("Rename Test Start")
+	log.Info("覆盖文件上传模式测试完成")
+	log.Info("重命名文件测试开始")
+	log.Info("检测Bucket是否存在即将与重命名文件同名文件")
 	req, err := t.Downloader.GetFileExiet("new_overwrite_test")
 	if err != nil {
+		log.Info("未发现有同名文件")
 		log.Warn(err)
 	}
 	if req {
@@ -211,9 +217,10 @@ func (t *TestCase) DeleteTest() error {
 	}
 	err = t.Modify.RenameFile("overwrite_test", "new_overwrite_test")
 	if err != nil {
-		log.Fatal(err)
+		log.Info(err)
+		log.Fatal("重命名文件测试失败")
 	}
-	log.Info("Rename Test Success")
+	log.Info("重命名文件测试完成")
 	return nil
 }
 
@@ -238,21 +245,24 @@ func runTestCase(ctx *cli.Context) error {
 		Bucketer:   operation.NewBucketer(x),
 		Modify:     operation.NewModifier(x),
 	}
-	log.Info("TestCase Init Success")
+	log.Info("测试用例初始化完成")
 	testCase.BucketInitTest()
-	log.Info("File Test Case")
+	log.Info("开始进行文件功能测试")
 	testCase.FileTest()
-	log.Info("Delete Test Case")
+	log.Info("开始进行Bucket删除相关检测")
 	testCase.DeleteTest()
-	log.Info("Clear")
+	log.Info("开始执行相关测试清理工作")
 	err = testCase.Modify.DeleteFile("new_overwrite_test")
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Info("清理测试Bucket测试文件成功")
 	testCase.Bucketer.DeleteBucket(testCase.Config.Bucket)
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Info("清理测试Bucket成功")
+	log.Info("测试完成")
 	return nil
 }
 
