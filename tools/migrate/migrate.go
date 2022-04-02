@@ -24,15 +24,27 @@ type MigrateFileConf struct {
 
 var Tasks = make(chan string, TaskLoad)
 
-func Migrate(qnFile, bstFile string, qnDownloader *qn.Downloader, bstUpload *operation.Uploader, size int64) error {
+func Migrate(qnFile, bstFile string, qnDownloader *qn.Downloader, bstUpload *operation.Uploader, bstDownload *operation.Downloader, size int64) error {
+
+	if !strings.HasPrefix(bstFile, "/") {
+		bstFile = fmt.Sprintf("/%s", bstFile)
+	}
+
+	stats, err := bstDownload.GetFileExiet(bstFile)
+	if err != nil {
+		log.Info(err)
+		return err
+	}
+	if stats {
+		log.Info("File Exist Skip")
+		return nil
+	}
 	_, reader, err := qnDownloader.DownloadRangeReader(qnFile, 0, size)
 	if err != nil {
 		log.Info("qiniu down src failed")
 		return err
 	}
-	if !strings.HasPrefix(bstFile, "/") {
-		bstFile = fmt.Sprintf("/%s", bstFile)
-	}
+
 	err = bstUpload.UploadFromReader(reader, size, bstFile, true)
 	if err != nil {
 		log.Info("BST upload dst failed")
@@ -111,6 +123,7 @@ func runMigrate(ctx *cli.Context) error {
 		log.Error(err)
 	}
 	bstUpload := operation.NewUploader(x)
+	bstDownloader := operation.NewDownloader(x)
 
 	var migrater = MigrateFileConf{
 		FileName: ctx.String("list"),
@@ -125,7 +138,7 @@ func runMigrate(ctx *cli.Context) error {
 		go func() {
 			size := checkSize(qnDownloader, value)
 			log.Info(value)
-			err = Migrate(value, value, qnDownloader, bstUpload, size)
+			err = Migrate(value, value, qnDownloader, bstUpload, bstDownloader, size)
 			if err != nil {
 				log.Error("Migrate failed ", value, " ", err)
 			}
