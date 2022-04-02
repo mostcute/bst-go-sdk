@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"stroage-go-sdk/operation"
+	"time"
 )
 
 var log = logging.Logger("Test Case")
@@ -114,12 +115,12 @@ func PathExists(path string) (bool, error) {
 }
 
 func (t *TestCase) BucketInitTest() (err error) {
-	log.Info("开始测试Bucket创建与删除")
+	log.Info("ooooo 开始测试Bucket创建与删除 ooooo")
 	err = t.Bucketer.MakeBucket(testBucketName)
 	HandleErr("Make Bucket ", err)
 	err = t.Bucketer.DeleteBucket(testBucketName)
 	HandleErr("Delete Bucket ", err)
-	log.Info("Bucket创建与删除测试完成")
+	log.Info("√√√√√ Bucket创建与删除测试完成 √√√√√")
 	return nil
 }
 
@@ -142,18 +143,24 @@ func (t *TestCase) FileTest() error {
 	log.Info("测试文件生成完成")
 	for i := 0; i < 8; i++ {
 		log.Infof("开始上传文件大小为%.2fKB的文件", FileSize[i]/1024)
-		t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i)), fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i)), true)
+		bT := time.Now() // 开始时间
+		err := t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i)), fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i)), true)
+		if err != nil {
+			log.Fatal("上传文件失败", err)
+		}
+		eT := time.Since(bT) // 从开始到当前所消耗的时间
+		log.Infof("上传文件成功 速度%.2f KB/s", FileSize[i]/eT.Seconds())
 	}
 	PathExists(verifyTmpPath)
 	for i := 0; i < 8; i++ {
 		t.Downloader.DownloadFile(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i)), fmt.Sprintf("%s/test_%s", verifyTmpPath, strconv.Itoa(i)))
 		dstMd5 := countFileMd5(fmt.Sprintf("%s/test_%s", verifyTmpPath, strconv.Itoa(i)))
-		log.Infof("开始校验上传文件的MD5是否正确, MD5比较结果：%s/%s", dstMd5, t.SrcMd5[i])
+		log.Infof("√√√√√ 开始校验上传文件的MD5是否正确, MD5比较结果：%s/%s 校验通过 √√√√√", dstMd5, t.SrcMd5[i])
 		if dstMd5 != t.SrcMd5[i] {
 			log.Fatal("Md5 检测失败")
 		}
 	}
-	log.Info("文件上传下载一致性检测完成")
+	log.Info("√√√√√文件上传下载一致性检测完成√√√√√")
 	return nil
 }
 
@@ -166,20 +173,20 @@ func (t *TestCase) DeleteTest() error {
 	err := t.Bucketer.DeleteBucket(t.Config.Bucket)
 	if err != nil {
 		if find := strings.Contains(err.Error(), "Bucket not empty cannot delete"); find {
-			log.Info("Bucket存在文件禁止删除测试通过")
+			log.Info("√√√√√ Bucket存在文件 禁止删除 测试通过 √√√√√")
 		}
 	} else {
-		log.Fatal("Bucket存在文件禁止删除测试失败")
+		log.Fatal("Bucket存在文件 禁止删除 测试失败")
 	}
-	log.Info("Bucket删除文件操作测试开始")
+	log.Info("ooooo Bucket删除文件 操作测试开始 ooooo")
 	for i := 0; i < 8; i++ {
 		err = t.Modify.DeleteFile(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i)))
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
-	log.Info("Bucket删除文件测试完成")
-	log.Info("非覆盖上传文件测试开始")
+	log.Info("√√√√√ Bucket删除文件测试完成 √√√√√")
+	log.Info("ooooo 非覆盖上传文件测试开始 ooooo")
 	PathExists(testTmpPath)
 	CreateFixedFile(FileSize[0], fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(0)))
 	err = t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(0)), "overwrite_test", true)
@@ -189,25 +196,27 @@ func (t *TestCase) DeleteTest() error {
 	err = t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(0)), "overwrite_test", false)
 	if err != nil {
 		if find := strings.Contains(err.Error(), "obj already exist"); find {
-			log.Info("非覆盖上传文件测试完成")
+			log.Info("发现上传失败报错 符合预期 校验成功")
+			log.Info("√√√√√ 非覆盖上传文件测试完成 √√√√√")
 		} else {
 			log.Fatal(err)
 		}
 	} else {
 		log.Fatal("非覆盖上传文件测试失败")
 	}
-	log.Info("覆盖文件上传模式测试开始")
+	log.Info("ooooo 覆盖文件上传模式测试开始 ooooo")
 	err = t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(0)), "overwrite_test", true)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Info("覆盖文件上传模式测试完成")
-	log.Info("重命名文件测试开始")
+	log.Info("√√√√√ 覆盖文件上传模式测试完成 √√√√√")
+	log.Info("ooooo 重命名文件测试开始 ooooo")
 	log.Info("检测Bucket是否存在即将与重命名文件同名文件")
 	req, err := t.Downloader.GetFileExiet("new_overwrite_test")
 	if err != nil {
-		log.Info("未发现有同名文件")
 		log.Warn(err)
+		log.Info("检测返回404 未发现同名文件 符合预期")
+
 	}
 	if req {
 		err = t.Modify.DeleteFile("new_overwrite_test")
@@ -220,7 +229,7 @@ func (t *TestCase) DeleteTest() error {
 		log.Info(err)
 		log.Fatal("重命名文件测试失败")
 	}
-	log.Info("重命名文件测试完成")
+	log.Info("√√√√√ 重命名文件测试完成 √√√√√")
 	return nil
 }
 
@@ -245,11 +254,11 @@ func runTestCase(ctx *cli.Context) error {
 		Bucketer:   operation.NewBucketer(x),
 		Modify:     operation.NewModifier(x),
 	}
-	log.Info("测试用例初始化完成")
+	log.Info("√√√√√ 测试用例初始化完成 √√√√√")
 	testCase.BucketInitTest()
-	log.Info("开始进行文件功能测试")
+	log.Info("ooooo开始进行文件功能测试ooooo")
 	testCase.FileTest()
-	log.Info("开始进行Bucket删除相关检测")
+	log.Info("ooooo开始进行Bucket删除相关检测ooooo")
 	testCase.DeleteTest()
 	log.Info("开始执行相关测试清理工作")
 	err = testCase.Modify.DeleteFile("new_overwrite_test")
