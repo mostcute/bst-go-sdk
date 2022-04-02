@@ -118,15 +118,20 @@ func runMigrate(ctx *cli.Context) error {
 		Data:     make([]string, 0),
 	}
 	migrater.readMigreteFile()
-
+	nums := ctx.Uint64("go")
+	limit := make(chan struct{}, nums)
 	for _, value := range migrater.Data {
-		size := checkSize(qnDownloader, value)
-		log.Info(value)
-		err = Migrate(value, value, qnDownloader, bstUpload, size)
-		if err != nil {
-			log.Error("Migrate failed ", value, " ", err)
-			continue
-		}
+		limit <- struct{}{}
+		go func() {
+			size := checkSize(qnDownloader, value)
+			log.Info(value)
+			err = Migrate(value, value, qnDownloader, bstUpload, size)
+			if err != nil {
+				log.Error("Migrate failed ", value, " ", err)
+			}
+			<-limit
+		}()
+
 	}
 	return nil
 }
@@ -200,6 +205,11 @@ var proveCmd = &cli.Command{
 			Name:  "list",
 			Usage: "migrate List",
 			Value: "./qiniu_list.txt",
+		},
+		&cli.Uint64Flag{
+			Name:  "go",
+			Usage: "limit file numbers to upload",
+			Value: 1,
 		},
 	},
 	Action: runMigrate,
