@@ -30,6 +30,9 @@ func Migrate(qnFile, bstFile string, qnDownloader *qn.Downloader, bstUpload *ope
 		log.Info("qiniu down src failed")
 		return err
 	}
+	if !strings.HasPrefix(bstFile, "/") {
+		bstFile = fmt.Sprintf("/%s", bstFile)
+	}
 	err = bstUpload.UploadBytes(srcFileByte, bstFile, true)
 	if err != nil {
 		log.Info("BST upload dst failed")
@@ -118,6 +121,62 @@ func runMigrate(ctx *cli.Context) error {
 	return nil
 }
 
+func runListGet(ctx *cli.Context) error {
+	if args := ctx.Args(); args.Len() > 0 {
+		return fmt.Errorf("invalid command: %q", args.Get(0))
+	}
+	f, err := os.Create(ctx.String("file"))
+	if err != nil {
+		fmt.Println(err)
+		f.Close()
+		return err
+	}
+
+	defer func() {
+		err = f.Close()
+		fmt.Println("file written successfully")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	}()
+
+	qnConf, err := qn.Load(ctx.String("qiniu"))
+	if err != nil {
+		log.Error("load config error")
+	}
+
+	lister := qn.NewLister(qnConf)
+	list := lister.ListPrefix("")
+	//print entries
+	for _, entry := range list {
+		fmt.Fprintln(f, entry)
+		if err != nil {
+			log.Fatal(err)
+			return err
+		}
+	}
+	return nil
+}
+
+var listCmd = &cli.Command{
+	Name:  "list",
+	Usage: "list qn bucket",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "qiniu",
+			Usage: "qiniu Env",
+			Value: "./cfg_qiniu.toml",
+		},
+		&cli.StringFlag{
+			Name:  "file",
+			Usage: "list file path",
+			Value: "./qiniu_list.txt",
+		},
+	},
+	Action: runListGet,
+}
+
 var proveCmd = &cli.Command{
 	Name:  "move",
 	Usage: "move qn to bst",
@@ -130,7 +189,7 @@ var proveCmd = &cli.Command{
 		&cli.StringFlag{
 			Name:  "list",
 			Usage: "migrate List",
-			Value: "./test",
+			Value: "./qiniu_list.txt",
 		},
 	},
 	Action: runMigrate,
@@ -143,6 +202,7 @@ func main() {
 		Version: "1.0.0",
 		Commands: []*cli.Command{
 			proveCmd,
+			listCmd,
 		},
 	}
 	if err := app.Run(os.Args); err != nil {

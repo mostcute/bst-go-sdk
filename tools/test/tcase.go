@@ -16,7 +16,7 @@ import (
 	"stroage-go-sdk/operation"
 )
 
-var log = logging.Logger("move")
+var log = logging.Logger("Test Case")
 
 const testBucketName = "testCase"
 const testTmpPath = "./tmpDir"
