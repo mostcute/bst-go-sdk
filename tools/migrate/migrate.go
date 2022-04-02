@@ -24,8 +24,8 @@ type MigrateFileConf struct {
 
 var Tasks = make(chan string, TaskLoad)
 
-func Migrate(qnFile, bstFile string, qnDownloader *qn.Downloader, bstUpload *operation.Uploader) error {
-	srcFileByte, err := qnDownloader.DownloadBytes(qnFile)
+func Migrate(qnFile, bstFile string, qnDownloader *qn.Downloader, bstUpload *operation.Uploader, size int64) error {
+	_, reader, err := qnDownloader.DownloadRangeReader(qnFile, 0, size)
 	if err != nil {
 		log.Info("qiniu down src failed")
 		return err
@@ -33,7 +33,7 @@ func Migrate(qnFile, bstFile string, qnDownloader *qn.Downloader, bstUpload *ope
 	if !strings.HasPrefix(bstFile, "/") {
 		bstFile = fmt.Sprintf("/%s", bstFile)
 	}
-	err = bstUpload.UploadBytes(srcFileByte, bstFile, true)
+	err = bstUpload.UploadFromReader(reader, size, bstFile, true)
 	if err != nil {
 		log.Info("BST upload dst failed")
 		return err
@@ -78,6 +78,14 @@ func (m *MigrateFileConf) readMigreteFile() (err error) {
 	return nil
 }
 
+func checkSize(qnDownloader *qn.Downloader, name string) int64 {
+	size, err := qnDownloader.DownloadCheck(name)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return size
+}
+
 func runMigrate(ctx *cli.Context) error {
 	var cf string
 	if os.Getenv("STORE") == "" {
@@ -93,6 +101,7 @@ func runMigrate(ctx *cli.Context) error {
 		log.Error("load config error")
 	}
 	qnDownloader := qn.NewDownloader(qnConf)
+
 	//_, err = qnDownloader.DownloadFile("root/.lotus-bench/bench052404401/cache/s-t01000-0/p_aux", "paux")
 	//if err != nil {
 	//	log.Error(err)
@@ -111,8 +120,9 @@ func runMigrate(ctx *cli.Context) error {
 	migrater.readMigreteFile()
 
 	for _, value := range migrater.Data {
+		size := checkSize(qnDownloader, value)
 		log.Info(value)
-		err = Migrate(value, value, qnDownloader, bstUpload)
+		err = Migrate(value, value, qnDownloader, bstUpload, size)
 		if err != nil {
 			log.Error("Migrate failed ", value, " ", err)
 			continue

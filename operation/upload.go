@@ -70,6 +70,23 @@ func (p *Uploader) Upload(file string, key string, overView bool) (err error) {
 	return
 }
 
+func (p *Uploader) UploadFromReader(reader io.Reader, size int64, key string, overView bool) (err error) {
+	t := time.Now()
+	defer func() {
+		elog.Info("up time ", key, time.Now().Sub(t))
+	}()
+	//key = strings.TrimPrefix(key, "/")
+
+	for i := 0; i < 3; i++ {
+		err = p.put(context.Background(), nil, key, reader, size, p.bucket, p.partSize, overView)
+		if err == nil {
+			break
+		}
+		elog.Info("small upload retry", i, err)
+	}
+	return
+}
+
 func (p *Uploader) UploadBytes(data []byte, key string, overView bool) (err error) {
 	t := time.Now()
 	defer func() {
