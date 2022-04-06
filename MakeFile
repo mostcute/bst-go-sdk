@@ -10,3 +10,7 @@ migrate:
 test:
 	rm -f testobj
 	go build $(GOFLAGS) -o testobj ./tools/test
+
+partation:
+	rm -f partation
+	go build $(GOFLAGS) -o partation ./tools/checkPartition
