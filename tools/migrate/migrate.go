@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"stroage-go-sdk/operation"
+	"sync"
 )
 
 var log = logging.Logger("move")
@@ -31,10 +32,10 @@ func Migrate(qnFile, bstFile string, qnDownloader *qn.Downloader, bstUpload *ope
 	}
 
 	stats, err := bstDownload.GetFileExiet(bstFile)
-	if err != nil {
-		log.Info(err)
-		return err
-	}
+	//if err != nil {
+	//	log.Info(err)
+	//	return err
+	//}
 	if stats {
 		log.Info("File Exist Skip")
 		return nil
@@ -66,7 +67,7 @@ func (m *MigrateFileConf) readLineTxt() ([]string, error) {
 		line = strings.TrimSpace(line)
 		if len(line) > 0 {
 			nameList = append(nameList, line)
-			Tasks <- line
+			//Tasks <- line
 		}
 		if err != nil {
 			if err == io.EOF {
@@ -130,22 +131,29 @@ func runMigrate(ctx *cli.Context) error {
 		Task:     make(chan string, TaskLoad),
 		Data:     make([]string, 0),
 	}
+	log.Info("start read file ")
 	migrater.readMigreteFile()
 	nums := ctx.Uint64("go")
 	limit := make(chan struct{}, nums)
+	log.Info("nums ", nums)
+	var wait sync.WaitGroup
 	for _, value := range migrater.Data {
 		limit <- struct{}{}
-		go func() {
-			size := checkSize(qnDownloader, value)
-			log.Info(value)
-			err = Migrate(value, value, qnDownloader, bstUpload, bstDownloader, size)
+		log.Info("nums ", nums)
+		wait.Add(1)
+		go func(v string) {
+			size := checkSize(qnDownloader, v)
+			log.Info(v)
+			err = Migrate(v, v, qnDownloader, bstUpload, bstDownloader, size)
 			if err != nil {
-				log.Error("Migrate failed ", value, " ", err)
+				log.Error("Migrate failed ", v, " ", err)
 			}
 			<-limit
-		}()
+			wait.Done()
+		}(value)
 
 	}
+	wait.Wait()
 	return nil
 }
 
