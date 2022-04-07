@@ -3,12 +3,12 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"git.wutoon.com/lintao/bst-go-sdk/operation"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/urfave/cli/v2"
 	. "io/ioutil"
 	"os"
 	"path"
-	"stroage-go-sdk/operation"
 )
 
 const testTmpPath = "./tmpDir"

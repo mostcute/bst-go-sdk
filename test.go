@@ -1,12 +1,12 @@
-package main
+package test
 
 import (
 	"flag"
+	"git.wutoon.com/lintao/bst-go-sdk/operation"
 	"log"
-	"stroage-go-sdk/operation"
 )
 
-func main() {
+func Testfunc() {
 	cf := flag.String("c", "cfg_bst.toml", "config")
 	flag.Parse()
 

@@ -3,13 +3,13 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"git.wutoon.com/lintao/bst-go-sdk/operation"
 	logging "github.com/ipfs/go-log/v2"
 	qn "github.com/qiniupd/qiniu-go-sdk/syncdata/operation"
 	"github.com/urfave/cli/v2"
 	"io"
 	"os"
 	"strings"
-	"stroage-go-sdk/operation"
 	"sync"
 )
 
