@@ -144,7 +144,7 @@ func (t *TestCase) FileTest() error {
 	for i := 0; i < 8; i++ {
 		log.Infof("开始上传文件大小为%.2fKB的文件", FileSize[i]/1024)
 		bT := time.Now() // 开始时间
-		err := t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i)), fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i)), true)
+		err := t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i)), fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(i)), true, true)
 		if err != nil {
 			log.Fatal("上传文件失败", err)
 		}
@@ -189,11 +189,11 @@ func (t *TestCase) DeleteTest() error {
 	log.Info("ooooo 非覆盖上传文件测试开始 ooooo")
 	PathExists(testTmpPath)
 	CreateFixedFile(FileSize[0], fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(0)))
-	err = t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(0)), "overwrite_test", true)
+	err = t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(0)), "overwrite_test", true, true)
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(0)), "overwrite_test", false)
+	err = t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(0)), "overwrite_test", false, true)
 	if err != nil {
 		if find := strings.Contains(err.Error(), "obj already exist"); find {
 			log.Info("发现上传失败报错 符合预期 校验成功")
@@ -205,7 +205,7 @@ func (t *TestCase) DeleteTest() error {
 		log.Fatal("非覆盖上传文件测试失败")
 	}
 	log.Info("ooooo 覆盖文件上传模式测试开始 ooooo")
-	err = t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(0)), "overwrite_test", true)
+	err = t.Uploader.Upload(fmt.Sprintf("%s/test_%s", testTmpPath, strconv.Itoa(0)), "overwrite_test", true, true)
 	if err != nil {
 		log.Fatal(err)
 	}

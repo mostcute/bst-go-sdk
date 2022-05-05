@@ -40,16 +40,33 @@ func Migrate(qnFile, bstFile string, qnDownloader *qn.Downloader, bstUpload *ope
 		log.Info("File Exist Skip")
 		return nil
 	}
-	_, reader, err := qnDownloader.DownloadRangeReader(qnFile, 0, size)
-	if err != nil {
-		log.Info("qiniu down src failed")
-		return err
-	}
+	for i := 0; i < 3; i++ {
+		var lastbytes io.Reader
+		if size > 32 {
+			_, lastbytes, err = qnDownloader.DownloadRangeReader(qnFile, size-32, 32)
+			if err != nil {
+				log.Info("qiniu down lastbytes failed")
+				return err
+			}
+		} else {
+			_, lastbytes, err = qnDownloader.DownloadRangeReader(qnFile, 0, size)
+			if err != nil {
+				log.Info("qiniu down lastbytes failed")
+				return err
+			}
+		}
 
-	err = bstUpload.UploadFromReader(reader, size, bstFile, true)
-	if err != nil {
-		log.Info("BST upload dst failed")
-		return err
+		_, reader, err := qnDownloader.DownloadRangeReader(qnFile, 0, size)
+		if err != nil {
+			log.Info("qiniu down src failed")
+			return err
+		}
+
+		err = bstUpload.UploadFromReader(reader, size, bstFile, true, true, lastbytes)
+		if err == nil {
+			break
+		}
+		log.Info("small upload retry", i, err)
 	}
 	return nil
 }
@@ -231,6 +248,11 @@ var proveCmd = &cli.Command{
 			Name:  "go",
 			Usage: "limit file numbers to upload",
 			Value: 1,
+		},
+		&cli.BoolFlag{
+			Name:  "bytes",
+			Usage: "use bytes mode",
+			Value: false,
 		},
 	},
 	Action: runMigrate,

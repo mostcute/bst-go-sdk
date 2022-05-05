@@ -3,7 +3,9 @@ package operation
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
+	"github.com/qiniupd/qiniu-go-sdk/x/log.v7"
 	"io"
 	"io/ioutil"
 	"net"
@@ -41,7 +43,7 @@ var uploadClient = &http.Client{
 	Timeout: 10 * time.Minute,
 }
 
-func (p *Uploader) Upload(file string, key string, overView bool) (err error) {
+func (p *Uploader) Upload(file string, key string, overView bool, byteMode bool) (err error) {
 	t := time.Now()
 	defer func() {
 		elog.Info("up time ", key, time.Now().Sub(t))
@@ -59,9 +61,25 @@ func (p *Uploader) Upload(file string, key string, overView bool) (err error) {
 		elog.Info("get file stat failed: ", err)
 		return err
 	}
-
+	header := make(map[string]string)
+	header["overwrite"] = strconv.FormatBool(overView)
+	header["blocksize"] = strconv.FormatInt(p.partSize, 10)
+	if byteMode && fInfo.Size() > 32 {
+		log.Info("Bytes Mode")
+		_, err = f.Seek(-32, os.SEEK_END)
+		if err != nil {
+			elog.Fatal(err)
+		}
+		b3 := make([]byte, 32)
+		_, err = io.ReadAtLeast(f, b3, 32)
+		if err != nil {
+			elog.Fatal(err)
+		}
+		header["lastbytes"] = string(b3)
+	}
+	log.Info(header)
 	for i := 0; i < 3; i++ {
-		err = p.put2(context.Background(), nil, key, newReaderAtNopCloser(f), fInfo.Size(), p.bucket, p.partSize, overView)
+		err = p.put2(context.Background(), nil, key, newReaderAtNopCloser(f), fInfo.Size(), p.bucket, header)
 		if err == nil {
 			break
 		}
@@ -69,32 +87,55 @@ func (p *Uploader) Upload(file string, key string, overView bool) (err error) {
 	}
 	return
 }
-
-func (p *Uploader) UploadFromReader(reader io.Reader, size int64, key string, overView bool) (err error) {
+func (p *Uploader) UploadFromReader(reader io.Reader, size int64, key string, overView bool, byteMode bool, lastbyte io.Reader) (err error) {
 	t := time.Now()
 	defer func() {
 		elog.Info("up time ", key, time.Now().Sub(t))
 	}()
 	//key = strings.TrimPrefix(key, "/")
-
-	for i := 0; i < 3; i++ {
-		err = p.put(context.Background(), nil, key, reader, size, p.bucket, p.partSize, overView)
-		if err == nil {
-			break
-		}
-		elog.Info("small upload retry", i, err)
+	header := make(map[string]string)
+	header["overwrite"] = strconv.FormatBool(overView)
+	header["blocksize"] = strconv.FormatInt(p.partSize, 10)
+	if byteMode {
+		log.Info("Bytes Mode")
+		var p = make([]byte, 32)
+		lastbyte.Read(p)
+		header["lastbytes"] = base64.StdEncoding.EncodeToString(p)
 	}
-	return
+	log.Info(header)
+
+	err = p.put(context.Background(), nil, key, reader, size, p.bucket, header)
+
+	if err != nil {
+		return err
+	}
+
+	//for i := 0; i < 3; i++ {
+	//	err = p.put(context.Background(), nil, key, reader, size, p.bucket, header)
+	//	if err == nil {
+	//		break
+	//	}
+	//	elog.Info("small upload retry", i, err)
+	//}
+	return nil
 }
 
-func (p *Uploader) UploadBytes(data []byte, key string, overView bool) (err error) {
+func (p *Uploader) UploadBytes(data []byte, key string, overView bool, byteMode bool) (err error) {
 	t := time.Now()
 	defer func() {
 		elog.Info("up time ", key, time.Now().Sub(t))
 	}()
 
+	header := make(map[string]string)
+	header["overwrite"] = strconv.FormatBool(overView)
+	header["blocksize"] = strconv.FormatInt(p.partSize, 10)
+	if byteMode && len(data) > 32 {
+		log.Info("Bytes Mode")
+		header["lastbytes"] = base64.StdEncoding.EncodeToString(data[len(data)-32-1 : len(data)-1])
+	}
+
 	for i := 0; i < 3; i++ {
-		err = p.put(context.Background(), nil, key, bytes.NewReader(data), int64(len(data)), p.bucket, p.partSize, overView)
+		err = p.put(context.Background(), nil, key, bytes.NewReader(data), int64(len(data)), p.bucket, header)
 		if err == nil {
 			break
 		}
@@ -138,7 +179,7 @@ func (p Uploader) chooseUpHost() string {
 }
 
 func (p Uploader) put(ctx context.Context, ret interface{}, key string, data io.Reader, size int64, bucket string,
-	blockSize int64, overView bool) error {
+	header map[string]string) error {
 
 	upHost := p.chooseUpHost()
 	url := "http://" + upHost + "/objects/put/" + bucket
@@ -153,8 +194,9 @@ func (p Uploader) put(ctx context.Context, ret interface{}, key string, data io.
 		return err
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
-	req.Header.Set("blocksize", strconv.FormatInt(blockSize, 10))
-	req.Header.Set("overwrite", strconv.FormatBool(overView))
+	for i, v := range header {
+		req.Header.Set(i, v)
+	}
 
 	req.ContentLength = size
 	resp, err := uploadClient.Do(req)
@@ -165,6 +207,8 @@ func (p Uploader) put(ctx context.Context, ret interface{}, key string, data io.
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		failHostName(upHost)
+		bodyText, _ := ioutil.ReadAll(resp.Body)
+		log.Info(string(bodyText))
 		return errors.New(resp.Status)
 	}
 	succeedHostName(upHost)
@@ -172,7 +216,7 @@ func (p Uploader) put(ctx context.Context, ret interface{}, key string, data io.
 }
 
 func (p Uploader) put2(ctx context.Context, ret interface{}, key string, data io.ReaderAt, size int64, bucket string,
-	blockSize int64, overView bool) error {
+	header map[string]string) error {
 
 	upHost := p.chooseUpHost()
 	url := "http://" + upHost + "/objects/put/" + bucket
@@ -186,9 +230,9 @@ func (p Uploader) put2(ctx context.Context, ret interface{}, key string, data io
 		failHostName(upHost)
 		return err
 	}
-	req.Header.Set("Content-Type", "application/octet-stream")
-	req.Header.Set("blocksize", strconv.FormatInt(blockSize, 10))
-	req.Header.Set("overwrite", strconv.FormatBool(overView))
+	for i, v := range header {
+		req.Header.Set(i, v)
+	}
 
 	req.ContentLength = size
 	resp, err := uploadClient.Do(req)

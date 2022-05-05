@@ -7,9 +7,9 @@ migrate:
 	rm -f migrate
 	go build $(GOFLAGS) -o migrate ./tools/migrate
 
-test:
-	rm -f testobj
-	go build $(GOFLAGS) -o testobj ./tools/test
+migrate:
+        rm -f migrate
+        go build $(GOFLAGS) -o testobj ./tools/test
 
 partation:
 	rm -f partation
