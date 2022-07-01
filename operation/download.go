@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -36,6 +37,35 @@ type Downloader struct {
 	bucket  string
 	ioHosts []string
 	queryer *Queryer
+}
+
+type wrapper struct {
+	s    io.ReadCloser
+	host string
+}
+
+type ExternHeaders struct {
+	Accept      []string `json:"Accept"`
+	Connection  []string `json:"Connection"`
+	ContentType []string `json:"Content-Type"`
+	Floder      []string `json:"Floder"`
+}
+
+type Res struct {
+	Size    int64         `json:"size"`
+	Eheader ExternHeaders `json:"extern-headers"`
+}
+
+func (w *wrapper) Read(p []byte) (n int, err error) {
+	n, err = w.s.Read(p)
+	if err != nil && err != io.EOF {
+		elog.Info("read interrupt", w.host, err)
+	}
+	return
+}
+
+func (w *wrapper) Close() error {
+	return w.s.Close()
 }
 
 func NewDownloader(c *Config) *Downloader {
@@ -81,6 +111,17 @@ func (d *Downloader) DownloadBytes(key string) (data []byte, err error) {
 func (d *Downloader) DownloadRangeBytes(key string, offset, size int64) (l int64, data []byte, err error) {
 	for i := 0; i < 3; i++ {
 		l, data, err = d.downloadRangeBytesInner(key, offset, size)
+		if err == nil {
+			break
+		}
+	}
+	return
+}
+
+func (d *Downloader) DownloadRangeReader(key string, offset, size int64) (l int64, reader io.ReadCloser, err error) {
+	failedIoHosts := make(map[string]struct{})
+	for i := 0; i < 3; i++ {
+		l, reader, err = d.downloadRangeReaderInner(key, offset, size, failedIoHosts)
 		if err == nil {
 			break
 		}
@@ -209,6 +250,55 @@ func (d *Downloader) downloadBytesInner(key string) ([]byte, error) {
 	return ioutil.ReadAll(response.Body)
 }
 
+func (d *Downloader) downloadRangeReaderInner(key string, offset, size int64, failedIoHosts map[string]struct{}) (int64, io.ReadCloser, error) {
+	headers := make(http.Header)
+	headers.Set("Range", generateRange(offset, size))
+	host := d.nextHost()
+
+	url := fmt.Sprintf("%s/objects/getfile/%s/%s", host, d.bucket, key)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		failHostName(host)
+		return -1, nil, err
+	}
+	req.Header.Set("Range", generateRange(offset, size))
+	req.Header.Set("User-Agent", rpc.UserAgent)
+	response, err := downloadClient.Do(req)
+	if err != nil {
+		failHostName(host)
+		return -1, nil, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusPartialContent {
+		failedIoHosts[host] = struct{}{}
+		failHostName(host)
+		response.Body.Close()
+		return -1, nil, errors.New(response.Status)
+	}
+
+	rangeResponse := response.Header.Get("Content-Range")
+	if rangeResponse == "" {
+		failedIoHosts[host] = struct{}{}
+		failHostName(host)
+		response.Body.Close()
+		return -1, nil, errors.New("no content range")
+	}
+
+	l, err := getTotalLength(rangeResponse)
+	if err != nil {
+		failedIoHosts[host] = struct{}{}
+		failHostName(host)
+		response.Body.Close()
+		return -1, nil, err
+	}
+	w := wrapper{
+		s:    response.Body,
+		host: host,
+	}
+	return l, &w, err
+}
+
 func generateRange(offset, size int64) string {
 	if offset == -1 {
 		return fmt.Sprintf("bytes=-%d", size)
@@ -274,7 +364,7 @@ func getTotalLength(crange string) (int64, error) {
 
 func (d *Downloader) getFileExietInner(fileName string) (string, error) {
 	host := d.nextHost()
-	elog.Infof("Get File Exiet %s \n", d.bucket)
+	//elog.Infof("Get File Exiet %s \n", d.bucket)
 	url := fmt.Sprintf("http://%s/objects/getfile/%s/%s", host, d.bucket, fileName)
 	req, err := http.NewRequest("HEAD", url, nil)
 	if err != nil {
@@ -297,6 +387,39 @@ func (d *Downloader) getFileExietInner(fileName string) (string, error) {
 	return response.Status, nil
 }
 
+func (d *Downloader) getFileSizeInner(fileName string) (int64, error) {
+	host := d.nextHost()
+	url := fmt.Sprintf("http://%s/objects/metadetail", host)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		failHostName(host)
+		return -1, err
+	}
+	req.Header.Set("object", fileName)
+	req.Header.Set("bucket", d.bucket)
+	response, err := downloadClient.Do(req)
+	if err != nil {
+		failHostName(host)
+		return -1, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusNotFound {
+		failHostName(host)
+		return -1, errors.New(response.Status)
+	}
+
+	b, err := ioutil.ReadAll(response.Body)
+	res := &Res{}
+	err = json.Unmarshal(b, res)
+	if err != nil {
+		fmt.Println(err)
+	}
+	succeedHostName(host)
+	return res.Size, nil
+
+}
+
 func (d *Downloader) GetFileExiet(fileName string) (bool, error) {
 	var err error
 	for i := 0; i < 3; i++ {
@@ -310,4 +433,15 @@ func (d *Downloader) GetFileExiet(fileName string) (bool, error) {
 		}
 	}
 	return false, err
+}
+
+func (d *Downloader) GetFileSize(fileName string) (int64, error) {
+	var err error
+	for i := 0; i < 3; i++ {
+		res, err := d.getFileSizeInner(fileName)
+		if err == nil {
+			return res, nil
+		}
+	}
+	return -1, err
 }

@@ -1,8 +1,10 @@
 package operation
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/qiniupd/qiniu-go-sdk/x/log.v7"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -14,6 +16,34 @@ type Modify struct {
 	bucket  string
 	ioHosts []string
 	queryer *Queryer
+}
+
+type ExHeader struct {
+	Floder []string `json:"floder"`
+}
+
+type MetaInfo struct {
+	Name      string   `json:"name"`
+	Size      int64    `json:"size"`
+	Type      int      `json:"type"`
+	Time      int64    `json:"time"`
+	Url       string   `json:"url"`
+	Dir       bool     `json:"isDir"`
+	Exheaders ExHeader `json:"extern-headers"`
+}
+
+type BstFiles struct {
+	Data []BstFile `json:"Data"`
+	Len  int       `json:"Len"`
+}
+
+type BstFile struct {
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+	Type int    `json:"type"`
+	Time int64  `json:"time"`
+	Url  string `json:"url"`
+	Dir  bool   `json:"isDir"`
 }
 
 var modifyClient = &http.Client{
@@ -119,6 +149,80 @@ func (d *Modify) renameInner(key string, newName string) error {
 	return nil
 }
 
+func (d *Modify) metaInfoInner(key string) (*MetaInfo, error) {
+	host := d.nextHost()
+	log.Infof("metaInfo File %s \n", d.bucket)
+	url := fmt.Sprintf("http://%s/objects/metadetail", host)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		failHostName(host)
+		return nil, err
+	}
+	req.Header.Set("object", key)
+	req.Header.Set("bucket", d.bucket)
+	response, err := downloadClient.Do(req)
+	if err != nil {
+		failHostName(host)
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if response.StatusCode != http.StatusOK {
+		failHostName(host)
+		return nil, errors.New(string(body))
+	}
+
+	metaInfoJson := MetaInfo{}
+	jsonErr := json.Unmarshal(body, &metaInfoJson)
+
+	if jsonErr != nil {
+		return nil, jsonErr
+	}
+	succeedHostName(host)
+	return &metaInfoJson, nil
+}
+
+func (d *Modify) listObjInner(prefix string, size int) (*BstFiles, error) {
+	host := d.nextHost()
+	log.Infof("listObject Files %s \n", d.bucket)
+	url := fmt.Sprintf("http://%s/objects/listobject/%s", host, d.bucket)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		failHostName(host)
+		return nil, err
+	}
+	req.Header.Set("size", fmt.Sprintf("%d", size))
+	req.Header.Set("Prefix", prefix)
+	response, err := downloadClient.Do(req)
+	if err != nil {
+		failHostName(host)
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode != http.StatusOK {
+		failHostName(host)
+		return nil, errors.New(string(body))
+	}
+	bstFiles := BstFiles{}
+	jsonErr := json.Unmarshal(body, &bstFiles)
+
+	if jsonErr != nil {
+		return nil, jsonErr
+	}
+	succeedHostName(host)
+	return &bstFiles, nil
+}
+
 func NewModifier(c *Config) *Modify {
 
 	var queryer *Queryer = nil
@@ -150,4 +254,29 @@ func (d *Modify) RenameFile(key, newname string) (err error) {
 		}
 	}
 	return err
+}
+
+func (d *Modify) MetaInfo(key string) (metaInfo *MetaInfo, err error) {
+	for i := 0; i < 3; i++ {
+		metaInfo, err = d.metaInfoInner(key)
+		if err == nil {
+			break
+		}
+	}
+	return
+}
+
+func (d *Modify) ListObject(prefix string, size int) (bstFiles *BstFiles, err error) {
+	for i := 0; i < 3; i++ {
+		bstFiles, err = d.listObjInner(prefix, size)
+		if err == nil {
+			break
+		}
+	}
+	return
+}
+
+func (d *Modify) LinkGen(name string, protocol string) string {
+	host := d.nextHost()
+	return fmt.Sprintf("%s://%s/objects/getfile/%s/%s", protocol, host, d.bucket, name)
 }

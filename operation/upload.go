@@ -75,7 +75,8 @@ func (p *Uploader) Upload(file string, key string, overView bool, byteMode bool)
 		if err != nil {
 			elog.Fatal(err)
 		}
-		header["lastbytes"] = string(b3)
+		//header["lastbytes"] = string(b3)
+		header["lastbytes"] = base64.StdEncoding.EncodeToString(b3)
 	}
 	log.Info(header)
 	for i := 0; i < 3; i++ {
@@ -133,6 +134,55 @@ func (p *Uploader) UploadBytes(data []byte, key string, overView bool, byteMode 
 		log.Info("Bytes Mode")
 		header["lastbytes"] = base64.StdEncoding.EncodeToString(data[len(data)-32-1 : len(data)-1])
 	}
+
+	for i := 0; i < 3; i++ {
+		err = p.put(context.Background(), nil, key, bytes.NewReader(data), int64(len(data)), p.bucket, header)
+		if err == nil {
+			break
+		}
+		elog.Info("small upload retry", i, err)
+	}
+	return
+}
+
+func (p *Uploader) UploadFromReaderNoByte(reader io.Reader, size int64, key string, overView bool) (err error) {
+	t := time.Now()
+	defer func() {
+		elog.Info("up time ", key, time.Now().Sub(t))
+	}()
+	//key = strings.TrimPrefix(key, "/")
+	header := make(map[string]string)
+	header["overwrite"] = strconv.FormatBool(overView)
+	header["blocksize"] = strconv.FormatInt(p.partSize, 10)
+
+	log.Info(header)
+
+	err = p.put(context.Background(), nil, key, reader, size, p.bucket, header)
+
+	if err != nil {
+		return err
+	}
+
+	//for i := 0; i < 3; i++ {
+	//	err = p.put(context.Background(), nil, key, reader, size, p.bucket, header)
+	//	if err == nil {
+	//		break
+	//	}
+	//	elog.Info("small upload retry", i, err)
+	//}
+	return nil
+}
+
+func (p *Uploader) UploadFloder(data []byte, key string, overView bool) (err error) {
+	t := time.Now()
+	defer func() {
+		elog.Info("up time ", key, time.Now().Sub(t))
+	}()
+
+	header := make(map[string]string)
+	header["overwrite"] = strconv.FormatBool(overView)
+	header["blocksize"] = strconv.FormatInt(p.partSize, 10)
+	header["floder"] = key
 
 	for i := 0; i < 3; i++ {
 		err = p.put(context.Background(), nil, key, bytes.NewReader(data), int64(len(data)), p.bucket, header)
