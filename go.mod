@@ -1,4 +1,4 @@
-module git.wutoon.com/lintao/bst-go-sdk
+module github.com/mostcute/bst-go-sdk
 
 go 1.16
 
