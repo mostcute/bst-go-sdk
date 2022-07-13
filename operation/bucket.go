@@ -212,10 +212,10 @@ func (b *Bucketer) listObjectInfoInner(bucketName, prefix, size, page string) (*
 		failHostName(host)
 		return nil, err
 	}
-	//req.Header.Set("Accept-Encoding", "")
+	req.Header.Set("Accept-Encoding", "")
 	req.Header.Set("Prefix", prefix)
 	req.Header.Set("size", size)
-	//req.Header.Set("Page", page)
+	req.Header.Set("Page", page)
 	response, err := bucketClient.Do(req)
 	if err != nil {
 		failHostName(host)
