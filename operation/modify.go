@@ -183,6 +183,9 @@ func (d *Modify) metaInfoInner(key string) (*MetaInfo, error) {
 	if jsonErr != nil {
 		return nil, jsonErr
 	}
+	if metaInfoJson.Exheaders.Floder != nil {
+		metaInfoJson.Dir = true
+	}
 	succeedHostName(host)
 	return &metaInfoJson, nil
 }
