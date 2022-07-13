@@ -224,9 +224,9 @@ func (d *Downloader) downloadFileInner(key, path string) (*os.File, error) {
 }
 
 func (d *Downloader) downloadBytesInner(key string) ([]byte, error) {
-	if strings.HasPrefix(key, "/") {
-		key = strings.TrimPrefix(key, "/")
-	}
+	//if strings.HasPrefix(key, "/") {
+	//	key = strings.TrimPrefix(key, "/")
+	//}
 	host := d.nextHost()
 
 	url := fmt.Sprintf("http://%s/objects/getfile/%s/%s", host, d.bucket, key)
