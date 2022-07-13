@@ -23,12 +23,26 @@ type ListBucketReq []struct {
 	Time      int    `json:"Time"`
 }
 
-type ListObjectReq []struct {
-	Bucket  string `json:"bucket"`
-	Name    string `json:"name"`
-	Version int    `json:"version"`
-	Size    int    `json:"size"`
-	Time    int    `json:"time"`
+//type ListObjectReq []struct {
+//	Bucket  string `json:"bucket"`
+//	Name    string `json:"name"`
+//	Version int    `json:"version"`
+//	Size    int    `json:"size"`
+//	Time    int    `json:"time"`
+//}
+
+type ListObjectReq struct {
+	Data []BstFileList `json:"Data"`
+	Len  int           `json:"Len"`
+}
+
+type BstFileList struct {
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+	Type int    `json:"type"`
+	Time int64  `json:"time"`
+	Url  string `json:"url"`
+	Dir  bool   `json:"isDir"`
 }
 
 var bucketClient = &http.Client{
@@ -189,7 +203,7 @@ func (b *Bucketer) getBucketInfoInner(bucketName string) (string, error) {
 	return response.Status, nil
 }
 
-func (b *Bucketer) listObjectInfoInner(bucketName, prefix, size, page string) (ListObjectReq, error) {
+func (b *Bucketer) listObjectInfoInner(bucketName, prefix, size, page string) (*ListObjectReq, error) {
 	host := b.nextBucketHost()
 	elog.Infof("list Bucket Object %s \n", b.bucket)
 	url := fmt.Sprintf("http://%s/objects/listobject/%s", host, bucketName)
@@ -198,10 +212,10 @@ func (b *Bucketer) listObjectInfoInner(bucketName, prefix, size, page string) (L
 		failHostName(host)
 		return nil, err
 	}
-	req.Header.Set("Accept-Encoding", "")
-	req.Header.Set("prefix", prefix)
-	req.Header.Set("Size", size)
-	req.Header.Set("Page", page)
+	//req.Header.Set("Accept-Encoding", "")
+	req.Header.Set("Prefix", prefix)
+	req.Header.Set("size", size)
+	//req.Header.Set("Page", page)
 	response, err := bucketClient.Do(req)
 	if err != nil {
 		failHostName(host)
@@ -225,7 +239,7 @@ func (b *Bucketer) listObjectInfoInner(bucketName, prefix, size, page string) (L
 		return nil, jsonErr
 	}
 	succeedHostName(host)
-	return listReq, nil
+	return &listReq, nil
 }
 
 func NewBucketer(c *Config) *Bucketer {
@@ -283,7 +297,7 @@ func (b *Bucketer) GetBucketInfo(bucketName string) (string, error) {
 	return err.Error(), err
 }
 
-func (b *Bucketer) ListObject(bucketName, prefix, size, page string) (ListObjectReq, error) {
+func (b *Bucketer) ListObject(bucketName, prefix, size, page string) (*ListObjectReq, error) {
 	var err error
 	for i := 0; i < 3; i++ {
 		list, err := b.listObjectInfoInner(bucketName, prefix, size, page)
