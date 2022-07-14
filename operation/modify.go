@@ -172,6 +172,10 @@ func (d *Modify) metaInfoInner(key string) (*MetaInfo, error) {
 		return nil, err
 	}
 
+	if response.StatusCode == http.StatusNotFound {
+		return nil, errors.New("Object Not Found")
+	}
+
 	if response.StatusCode != http.StatusOK {
 		failHostName(host)
 		return nil, errors.New(string(body))
@@ -262,7 +266,7 @@ func (d *Modify) RenameFile(key, newname string) (err error) {
 func (d *Modify) MetaInfo(key string) (metaInfo *MetaInfo, err error) {
 	for i := 0; i < 3; i++ {
 		metaInfo, err = d.metaInfoInner(key)
-		if err == nil {
+		if err == nil || err == errors.New("Object Not Found") {
 			break
 		}
 	}
