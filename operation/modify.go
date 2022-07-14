@@ -266,7 +266,7 @@ func (d *Modify) RenameFile(key, newname string) (err error) {
 func (d *Modify) MetaInfo(key string) (metaInfo *MetaInfo, err error) {
 	for i := 0; i < 3; i++ {
 		metaInfo, err = d.metaInfoInner(key)
-		if err == nil || err == errors.New("Object Not Found") {
+		if err == nil || err.Error() == "Object Not Found" {
 			break
 		}
 	}
