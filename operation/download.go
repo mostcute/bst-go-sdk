@@ -129,6 +129,17 @@ func (d *Downloader) DownloadRangeReader(key string, offset, size int64) (l int6
 	return
 }
 
+func (d *Downloader) DownloadRaw(key string, headers http.Header) (resp *http.Response, err error) {
+	failedIoHosts := make(map[string]struct{})
+	for i := 0; i < 3; i++ {
+		resp, _, err = d.downloadRawInner(key, headers, failedIoHosts)
+		if err == nil {
+			return
+		}
+	}
+	return
+}
+
 // fileExists checks if a file exists and is not a directory before we
 // try using it to prevent further errors.
 func fileExists(filename string) bool {
@@ -297,6 +308,28 @@ func (d *Downloader) downloadRangeReaderInner(key string, offset, size int64, fa
 		host: host,
 	}
 	return l, &w, err
+}
+
+func (d *Downloader) downloadRawInner(key string, headers http.Header, failedIoHosts map[string]struct{}) (*http.Response, string, error) {
+	host := d.nextHost()
+
+	url := fmt.Sprintf("%s/objects/getfile/%s/%s", host, d.bucket, key)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		failedIoHosts[host] = struct{}{}
+		failHostName(host)
+		return nil, host, err
+	}
+	for headerName, headerValue := range headers {
+		req.Header[headerName] = headerValue
+	}
+	response, err := downloadClient.Do(req)
+	if err != nil {
+		failedIoHosts[host] = struct{}{}
+		failHostName(host)
+		return nil, host, err
+	}
+	return response, host, nil
 }
 
 func generateRange(offset, size int64) string {
